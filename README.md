@@ -14,7 +14,7 @@ Go + Gin + Supabase で構築するダーツ得点記録アプリのバックエ
 | Webフレームワーク | [Gin](https://github.com/gin-gonic/gin) |
 | ORM | [GORM](https://gorm.io/) |
 | データベース | [Supabase](https://supabase.com/) (PostgreSQL) |
-| 認証 | Supabase Auth(本APIがプロキシし、JWTはJWKS/共有シークレットで検証のみ行う) |
+| 認証 | Supabase Auth(本APIがプロキシし、JWTはJWKSで検証のみ行う) |
 | APIドキュメント | [swaggo/swag](https://github.com/swaggo/swag) (OpenAPI) |
 | 環境変数 | [godotenv](https://github.com/joho/godotenv) |
 | コンテナ | Docker |

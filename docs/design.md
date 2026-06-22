@@ -157,6 +157,10 @@ darts-tracker-web/
 - フロントエンド: `npm run build`で型エラーなしを確認、ローカルで実際にサインアップ〜記録登録〜グラフ表示までブラウザ操作で確認
 - 認証フロー: Goバックエンドのsignup/loginが実際にSupabaseプロジェクトにユーザーを作成し、返ってきたトークンで`/api/v1/records`にアクセスできることを確認
 
-## 未確定で着手後に判断が必要な点
+## 解決済み: JWT署名方式
 
-- SupabaseプロジェクトのJWT署名方式(HS256共有シークレット or 新方式のJWKS/RS256)はプロジェクト作成後でないと確定しないため、ミドルウェア実装時に実際の設定値を見て対応する
+新規作成したSupabaseプロジェクトはJWT Signing Keys方式(ES256非対称鍵)がデフォルトで、ダッシュボードに共有シークレット(HS256)の設定項目が存在しなかった。そのため、`internal/handler/middleware/auth.go`は`SUPABASE_JWT_SECRET`を使うHS256検証ではなく、`{SUPABASE_URL}/auth/v1/.well-known/jwks.json`から公開鍵を取得して検証するJWKS方式(`github.com/MicahParks/keyfunc/v3`を使用)で実装している。`.env`に`SUPABASE_JWT_SECRET`の設定は不要。
+
+## 解決済み: APIキーの名称
+
+同様にAPIキー体系も刷新されており、`anon key`は**Publishable key**(`sb_publishable_...`)に名称・形式が変わっている(`service_role`は`Secret key`に対応)。Supabase Auth APIのsignup/login/refresh呼び出しは公式ドキュメントのcURL例でもPublishable keyを使う想定のため、`SUPABASE_ANON_KEY`という環境変数名は`SUPABASE_PUBLISHABLE_KEY`に変更した。Secret keyは管理者操作用のため本アプリでは使用しない。
