@@ -30,6 +30,9 @@ func (u *gameRecordUsecase) Create(userID string, gameType entity.GameType, valu
 	if !gameType.Valid() {
 		return nil, entity.ErrInvalidGameType
 	}
+	if value > maxValueForGameType(gameType) {
+		return nil, entity.ErrValueOutOfRange
+	}
 
 	record := &entity.GameRecord{
 		UserID:   userID,
@@ -72,6 +75,9 @@ func (u *gameRecordUsecase) Update(id uint, userID string, value float64, played
 	if record == nil {
 		return nil, entity.ErrGameRecordNotFound
 	}
+	if value > maxValueForGameType(record.GameType) {
+		return nil, entity.ErrValueOutOfRange
+	}
 
 	record.Value = value
 	record.Rating = calculateRating(record.GameType, value)
@@ -112,4 +118,21 @@ func calculateRating(gameType entity.GameType, value float64) *float64 {
 		return nil
 	}
 	return &r
+}
+
+// maxValueForGameType はゲーム種別ごとの理論上の最大値。
+// 01Game: 1ラウンド(3投)の最大点(トリプル20×3) = 180
+// クリケット: 1ラウンド(3投)の最大マーク数(トリプル=3マーク×3投) = 9
+// COUNTUP: DARTSLIVE標準の8ラウンド(24投)でのトリプル20連続 = 1440
+func maxValueForGameType(gameType entity.GameType) float64 {
+	switch gameType {
+	case entity.GameType01Game:
+		return 180
+	case entity.GameTypeCricket:
+		return 9
+	case entity.GameTypeCountUp:
+		return 1440
+	default:
+		return 0
+	}
 }

@@ -37,4 +37,5 @@ type GameRecord struct {
 var (
 	ErrGameRecordNotFound = errors.New("game record not found")
 	ErrInvalidGameType    = errors.New("invalid game type")
+	ErrValueOutOfRange    = errors.New("value out of range for this game type")
 )

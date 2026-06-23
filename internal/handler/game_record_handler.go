@@ -22,13 +22,13 @@ func NewGameRecordHandler(gameRecordUsecase usecase.GameRecordUsecase) *GameReco
 // 記録作成のリクエストボディ
 type CreateGameRecordRequest struct {
 	GameType string    `json:"game_type" binding:"required,oneof=01game cricket countup"`
-	Value    float64   `json:"value" binding:"required"`
+	Value    float64   `json:"value" binding:"gte=0"`
 	PlayedAt time.Time `json:"played_at" binding:"required"`
 }
 
 // 記録更新のリクエストボディ
 type UpdateGameRecordRequest struct {
-	Value    float64   `json:"value" binding:"required"`
+	Value    float64   `json:"value" binding:"gte=0"`
 	PlayedAt time.Time `json:"played_at" binding:"required"`
 }
 
@@ -56,7 +56,7 @@ func (h *GameRecordHandler) CreateGameRecord(ctx *gin.Context) {
 
 	record, err := h.gameRecordUsecase.Create(getUserID(ctx), entity.GameType(req.GameType), req.Value, req.PlayedAt)
 	if err != nil {
-		if errors.Is(err, entity.ErrInvalidGameType) {
+		if errors.Is(err, entity.ErrInvalidGameType) || errors.Is(err, entity.ErrValueOutOfRange) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -127,6 +127,10 @@ func (h *GameRecordHandler) UpdateGameRecord(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, entity.ErrGameRecordNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		if errors.Is(err, entity.ErrValueOutOfRange) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update game record"})
