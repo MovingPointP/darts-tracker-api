@@ -120,6 +120,7 @@ func (h *GameRecordHandler) GetGameRecords(ctx *gin.Context) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit"})
 			return
 		}
+		}
 		filter.Limit = v
 	}
 
