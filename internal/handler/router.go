@@ -36,13 +36,21 @@ func NewRouter(authHandler *AuthHandler, gameRecordHandler *GameRecordHandler, a
 		}
 
 		// 認証必要
-		records := v1.Group("/records")
-		records.Use(authMiddleware)
+		protected := v1.Group("")
+		protected.Use(authMiddleware)
 		{
-			records.POST("", gameRecordHandler.CreateGameRecord)
-			records.GET("", gameRecordHandler.GetGameRecords)
-			records.PUT("/:id", gameRecordHandler.UpdateGameRecord)
-			records.DELETE("/:id", gameRecordHandler.DeleteGameRecord)
+			records := protected.Group("/records")
+			{
+				records.POST("", gameRecordHandler.CreateGameRecord)
+				records.GET("", gameRecordHandler.GetGameRecords)
+				records.PUT("/:id", gameRecordHandler.UpdateGameRecord)
+				records.DELETE("/:id", gameRecordHandler.DeleteGameRecord)
+			}
+
+			stats := protected.Group("/stats")
+			{
+				stats.GET("/ratings", gameRecordHandler.GetDailyRatings)
+			}
 		}
 	}
 	return r

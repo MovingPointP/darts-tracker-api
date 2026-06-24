@@ -12,7 +12,6 @@ type gormGameRecordRepository struct {
 	db *gorm.DB
 }
 
-// コンストラクタ
 func NewGameRecordRepository(db *gorm.DB) repository.GameRecordRepository {
 	return &gormGameRecordRepository{db: db}
 }
@@ -23,7 +22,6 @@ func (r *gormGameRecordRepository) Create(record *entity.GameRecord) error {
 
 func (r *gormGameRecordRepository) FindByID(id uint, userID string) (*entity.GameRecord, error) {
 	var record entity.GameRecord
-
 	if err := r.db.Where("id = ? AND user_id = ?", id, userID).First(&record).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -33,17 +31,46 @@ func (r *gormGameRecordRepository) FindByID(id uint, userID string) (*entity.Gam
 	return &record, nil
 }
 
-func (r *gormGameRecordRepository) FindAllByUserID(userID string, gameType *entity.GameType) ([]*entity.GameRecord, error) {
-	var records []*entity.GameRecord
-
-	query := r.db.Where("user_id = ?", userID)
-	if gameType != nil {
-		query = query.Where("game_type = ?", *gameType)
+func (r *gormGameRecordRepository) FindWithFilter(userID string, filter repository.RecordsFilter) (*repository.PagedRecords, error) {
+	query := r.db.Model(&entity.GameRecord{}).Where("user_id = ?", userID)
+	if filter.GameType != nil {
+		query = query.Where("game_type = ?", *filter.GameType)
 	}
-	if err := query.Order("played_at DESC").Find(&records).Error; err != nil {
+	if filter.From != nil {
+		query = query.Where("played_at >= ?", *filter.From)
+	}
+	if filter.To != nil {
+		// 終了日は当日23:59:59まで含める
+		query = query.Where("played_at < ?", filter.To.AddDate(0, 0, 1))
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
 		return nil, err
 	}
-	return records, nil
+
+	var records []*entity.GameRecord
+	if err := query.Order("played_at DESC").Limit(filter.Limit).Offset(filter.Offset).Find(&records).Error; err != nil {
+		return nil, err
+	}
+
+	return &repository.PagedRecords{
+		Records: records,
+		Total:   total,
+		Limit:   filter.Limit,
+		Offset:  filter.Offset,
+	}, nil
+}
+
+func (r *gormGameRecordRepository) AggregateRatingByDay(userID string, gameType entity.GameType) ([]*repository.DailyRating, error) {
+	var results []*repository.DailyRating
+	err := r.db.Model(&entity.GameRecord{}).
+		Select("TO_CHAR(played_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, ROUND(AVG(rating)::numeric, 2) AS rating").
+		Where("user_id = ? AND game_type = ? AND rating IS NOT NULL", userID, gameType).
+		Group("TO_CHAR(played_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')").
+		Order("date ASC").
+		Scan(&results).Error
+	return results, err
 }
 
 func (r *gormGameRecordRepository) Update(record *entity.GameRecord) error {

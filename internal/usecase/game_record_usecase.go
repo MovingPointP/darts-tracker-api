@@ -12,7 +12,8 @@ import (
 type GameRecordUsecase interface {
 	Create(userID string, gameType entity.GameType, value float64, playedAt time.Time) (*entity.GameRecord, error)
 	Get(id uint, userID string) (*entity.GameRecord, error)
-	GetAll(userID string, gameType *entity.GameType) ([]*entity.GameRecord, error)
+	GetWithFilter(userID string, filter repository.RecordsFilter) (*repository.PagedRecords, error)
+	GetDailyRatings(userID string, gameType entity.GameType) ([]*repository.DailyRating, error)
 	Update(id uint, userID string, value float64, playedAt time.Time) (*entity.GameRecord, error)
 	Delete(id uint, userID string) error
 }
@@ -21,7 +22,6 @@ type gameRecordUsecase struct {
 	gameRecordRepo repository.GameRecordRepository
 }
 
-// コンストラクタ
 func NewGameRecordUsecase(gameRecordRepo repository.GameRecordRepository) GameRecordUsecase {
 	return &gameRecordUsecase{gameRecordRepo: gameRecordRepo}
 }
@@ -58,16 +58,26 @@ func (u *gameRecordUsecase) Get(id uint, userID string) (*entity.GameRecord, err
 	return record, nil
 }
 
-func (u *gameRecordUsecase) GetAll(userID string, gameType *entity.GameType) ([]*entity.GameRecord, error) {
-	records, err := u.gameRecordRepo.FindAllByUserID(userID, gameType)
+func (u *gameRecordUsecase) GetWithFilter(userID string, filter repository.RecordsFilter) (*repository.PagedRecords, error) {
+	result, err := u.gameRecordRepo.FindWithFilter(userID, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get game records: %w", err)
 	}
-	return records, nil
+	return result, nil
+}
+
+func (u *gameRecordUsecase) GetDailyRatings(userID string, gameType entity.GameType) ([]*repository.DailyRating, error) {
+	if !gameType.Valid() || gameType == entity.GameTypeCountUp {
+		return nil, entity.ErrInvalidGameType
+	}
+	ratings, err := u.gameRecordRepo.AggregateRatingByDay(userID, gameType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate ratings: %w", err)
+	}
+	return ratings, nil
 }
 
 func (u *gameRecordUsecase) Update(id uint, userID string, value float64, playedAt time.Time) (*entity.GameRecord, error) {
-	// 記録の取得(所有権チェックを兼ねる)
 	record, err := u.gameRecordRepo.FindByID(id, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get game record: %w", err)
@@ -90,7 +100,6 @@ func (u *gameRecordUsecase) Update(id uint, userID string, value float64, played
 }
 
 func (u *gameRecordUsecase) Delete(id uint, userID string) error {
-	// 記録の取得(所有権チェックを兼ねる)
 	record, err := u.gameRecordRepo.FindByID(id, userID)
 	if err != nil {
 		return fmt.Errorf("failed to get game record: %w", err)
@@ -98,15 +107,12 @@ func (u *gameRecordUsecase) Delete(id uint, userID string) error {
 	if record == nil {
 		return entity.ErrGameRecordNotFound
 	}
-
 	if err := u.gameRecordRepo.Delete(id, userID); err != nil {
 		return fmt.Errorf("failed to delete game record: %w", err)
 	}
 	return nil
 }
 
-// calculateRating はゲーム種別に応じてレーティングを算出する。
-// COUNTUPはレーティング算出対象外のためnilを返す。
 func calculateRating(gameType entity.GameType, value float64) *float64 {
 	var r float64
 	switch gameType {
