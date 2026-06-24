@@ -49,7 +49,7 @@ func (r *gormGameRecordRepository) FindWithFilter(userID string, filter reposito
 		return nil, err
 	}
 
-	var records []*entity.GameRecord
+	records := []*entity.GameRecord{}
 	if err := query.Order("played_at DESC").Limit(filter.Limit).Offset(filter.Offset).Find(&records).Error; err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (r *gormGameRecordRepository) FindWithFilter(userID string, filter reposito
 }
 
 func (r *gormGameRecordRepository) AggregateRatingByDay(userID string, gameType entity.GameType) ([]*repository.DailyRating, error) {
-	var results []*repository.DailyRating
+	results := []*repository.DailyRating{}
 	err := r.db.Model(&entity.GameRecord{}).
 		Select("TO_CHAR(played_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, ROUND(AVG(rating)::numeric, 2) AS rating").
 		Where("user_id = ? AND game_type = ? AND rating IS NOT NULL", userID, gameType).
