@@ -104,10 +104,11 @@ var ErrGameRecordNotFound = errors.New("game record not found")
 | POST | /api/v1/auth/signup | 不要 | Supabase Authへプロキシ |
 | POST | /api/v1/auth/login | 不要 | Supabase Authへプロキシ(password grant) |
 | POST | /api/v1/auth/refresh | 不要 | Supabase Authへプロキシ(refresh grant) |
-| GET | /api/v1/records | 必要 | 一覧(`?game_type=`でフィルタ) |
+| GET | /api/v1/records | 必要 | 一覧(`?game_type=` / `?from=YYYY-MM-DD` / `?to=YYYY-MM-DD` / `?limit=` / `?offset=`)。レスポンスは`{records, total, limit, offset}` |
 | POST | /api/v1/records | 必要 | 作成(01game/cricketはサーバー側でレーティング自動計算) |
 | PUT | /api/v1/records/:id | 必要 | 更新(値変更時はレーティング再計算) |
 | DELETE | /api/v1/records/:id | 必要 | 削除 |
+| GET | /api/v1/stats/ratings | 必要 | 日別平均レーティング(`?game_type=01game\|cricket`必須)。DBで`GROUP BY date / AVG(rating)`して返す。グラフ表示用 |
 
 CORSはVercelの本番/プレビュードメインを許可リストに追加(`gin-contrib/cors`を新規導入)。
 

@@ -7,9 +7,12 @@ import (
 	"time"
 
 	"github.com/MovingPointP/darts-tracker-api/internal/domain/entity"
+	"github.com/MovingPointP/darts-tracker-api/internal/domain/repository"
 	"github.com/MovingPointP/darts-tracker-api/internal/usecase"
 	"github.com/gin-gonic/gin"
 )
+
+const defaultPageSize = 20
 
 type GameRecordHandler struct {
 	gameRecordUsecase usecase.GameRecordUsecase
@@ -19,14 +22,12 @@ func NewGameRecordHandler(gameRecordUsecase usecase.GameRecordUsecase) *GameReco
 	return &GameRecordHandler{gameRecordUsecase: gameRecordUsecase}
 }
 
-// 記録作成のリクエストボディ
 type CreateGameRecordRequest struct {
 	GameType string    `json:"game_type" binding:"required,oneof=01game cricket countup"`
 	Value    float64   `json:"value" binding:"gte=0"`
 	PlayedAt time.Time `json:"played_at" binding:"required"`
 }
 
-// 記録更新のリクエストボディ
 type UpdateGameRecordRequest struct {
 	Value    float64   `json:"value" binding:"gte=0"`
 	PlayedAt time.Time `json:"played_at" binding:"required"`
@@ -68,33 +69,111 @@ func (h *GameRecordHandler) CreateGameRecord(ctx *gin.Context) {
 }
 
 // @Summary     記録一覧取得
-// @Description ログインユーザーの記録を取得する。game_typeで種目フィルタ可能
+// @Description ログインユーザーの記録をフィルタ・ページネーション付きで取得する
 // @Tags        records
 // @Security    BearerAuth
 // @Produce     json
 // @Param       game_type query string false "種目フィルタ(01game/cricket/countup)"
-// @Success     200 {array} entity.GameRecord
+// @Param       from      query string false "開始日(YYYY-MM-DD)"
+// @Param       to        query string false "終了日(YYYY-MM-DD)"
+// @Param       limit     query int    false "1ページあたりの件数(デフォルト20)"
+// @Param       offset    query int    false "スキップする件数(デフォルト0)"
+// @Success     200 {object} repository.PagedRecords
 // @Failure     400 {object} map[string]string
 // @Failure     500 {object} map[string]string
 // @Router      /records [get]
 func (h *GameRecordHandler) GetGameRecords(ctx *gin.Context) {
-	var gameType *entity.GameType
+	filter := repository.RecordsFilter{
+		Limit: defaultPageSize,
+	}
+
 	if q := ctx.Query("game_type"); q != "" {
 		gt := entity.GameType(q)
 		if !gt.Valid() {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": entity.ErrInvalidGameType.Error()})
 			return
 		}
-		gameType = &gt
+		filter.GameType = &gt
 	}
 
-	records, err := h.gameRecordUsecase.GetAll(getUserID(ctx), gameType)
+	if q := ctx.Query("from"); q != "" {
+		t, err := time.Parse("2006-01-02", q)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid from date, expected YYYY-MM-DD"})
+			return
+		}
+		filter.From = &t
+	}
+
+	if q := ctx.Query("to"); q != "" {
+		t, err := time.Parse("2006-01-02", q)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid to date, expected YYYY-MM-DD"})
+			return
+		}
+		filter.To = &t
+	}
+
+	if q := ctx.Query("limit"); q != "" {
+		v, err := strconv.Atoi(q)
+		if err != nil || v <= 0 {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit"})
+			return
+		}
+		const maxLimit = 100
+		if v > maxLimit {
+			v = maxLimit
+		}
+		filter.Limit = v
+	}
+
+	if q := ctx.Query("offset"); q != "" {
+		v, err := strconv.Atoi(q)
+		if err != nil || v < 0 {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid offset"})
+			return
+		}
+		filter.Offset = v
+	}
+
+	result, err := h.gameRecordUsecase.GetWithFilter(getUserID(ctx), filter)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get game records"})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, records)
+	ctx.JSON(http.StatusOK, result)
+}
+
+// @Summary     日別平均レーティング取得
+// @Description 指定種目の日別平均レーティングを時系列順で返す(グラフ表示用)
+// @Tags        stats
+// @Security    BearerAuth
+// @Produce     json
+// @Param       game_type query string true "種目(01game/cricket)"
+// @Success     200 {array} repository.DailyRating
+// @Failure     400 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /stats/ratings [get]
+func (h *GameRecordHandler) GetDailyRatings(ctx *gin.Context) {
+	q := ctx.Query("game_type")
+	if q == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "game_type is required"})
+		return
+	}
+	gameType := entity.GameType(q)
+
+	ratings, err := h.gameRecordUsecase.GetDailyRatings(getUserID(ctx), gameType)
+	if err != nil {
+		if errors.Is(err, entity.ErrInvalidGameType) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get daily ratings"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, ratings)
 }
 
 // @Summary     記録更新
