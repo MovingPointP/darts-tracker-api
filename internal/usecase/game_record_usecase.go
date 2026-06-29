@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -100,14 +101,10 @@ func (u *gameRecordUsecase) Update(id uint, userID string, value float64, played
 }
 
 func (u *gameRecordUsecase) Delete(id uint, userID string) error {
-	record, err := u.gameRecordRepo.FindByID(id, userID)
-	if err != nil {
-		return fmt.Errorf("failed to get game record: %w", err)
-	}
-	if record == nil {
-		return entity.ErrGameRecordNotFound
-	}
 	if err := u.gameRecordRepo.Delete(id, userID); err != nil {
+		if errors.Is(err, entity.ErrGameRecordNotFound) {
+			return entity.ErrGameRecordNotFound
+		}
 		return fmt.Errorf("failed to delete game record: %w", err)
 	}
 	return nil

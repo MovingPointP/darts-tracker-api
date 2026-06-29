@@ -78,5 +78,12 @@ func (r *gormGameRecordRepository) Update(record *entity.GameRecord) error {
 }
 
 func (r *gormGameRecordRepository) Delete(id uint, userID string) error {
-	return r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&entity.GameRecord{}).Error
+	result := r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&entity.GameRecord{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return entity.ErrGameRecordNotFound
+	}
+	return nil
 }
