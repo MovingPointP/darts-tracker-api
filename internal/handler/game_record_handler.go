@@ -246,5 +246,5 @@ func (h *GameRecordHandler) DeleteGameRecord(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusNoContent, nil)
+	ctx.Status(http.StatusNoContent)
 }
