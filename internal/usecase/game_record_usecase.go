@@ -34,6 +34,9 @@ func (u *gameRecordUsecase) Create(userID string, gameType entity.GameType, valu
 	if value > maxValueForGameType(gameType) {
 		return nil, entity.ErrValueOutOfRange
 	}
+	if err := entity.ValidateAwards(awards); err != nil {
+		return nil, err
+	}
 
 	record := &entity.GameRecord{
 		UserID:   userID,
@@ -89,6 +92,9 @@ func (u *gameRecordUsecase) Update(id uint, userID string, value float64, played
 	}
 	if value > maxValueForGameType(record.GameType) {
 		return nil, entity.ErrValueOutOfRange
+	}
+	if err := entity.ValidateAwards(awards); err != nil {
+		return nil, err
 	}
 
 	record.Value = value

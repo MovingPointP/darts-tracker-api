@@ -63,7 +63,8 @@ func (h *GameRecordHandler) CreateGameRecord(ctx *gin.Context) {
 	}
 	record, err := h.gameRecordUsecase.Create(getUserID(ctx), entity.GameType(req.GameType), req.Value, req.PlayedAt, awards)
 	if err != nil {
-		if errors.Is(err, entity.ErrInvalidGameType) || errors.Is(err, entity.ErrValueOutOfRange) {
+		if errors.Is(err, entity.ErrInvalidGameType) || errors.Is(err, entity.ErrValueOutOfRange) ||
+			errors.Is(err, entity.ErrInvalidAwardName) || errors.Is(err, entity.ErrInvalidAwardCount) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -218,7 +219,8 @@ func (h *GameRecordHandler) UpdateGameRecord(ctx *gin.Context) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
-		if errors.Is(err, entity.ErrValueOutOfRange) {
+		if errors.Is(err, entity.ErrValueOutOfRange) ||
+			errors.Is(err, entity.ErrInvalidAwardName) || errors.Is(err, entity.ErrInvalidAwardCount) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
