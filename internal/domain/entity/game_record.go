@@ -29,6 +29,7 @@ type GameRecord struct {
 	GameType GameType `json:"game_type" gorm:"not null;index:idx_game_records_user_game_date,composite:game_type,priority:2"`
 	Value    float64  `json:"value" gorm:"not null"`
 	Rating   *float64 `json:"rating"`
+	Awards   map[string]int `json:"awards" gorm:"type:jsonb;serializer:json;default:'{}'"`
 	// idx_game_records_user_game_dateは集計クエリ(AggregateRatingByDay)とフィルタクエリの高速化のために使用する
 	PlayedAt  time.Time `json:"played_at" gorm:"not null;index:idx_game_records_user_game_date,composite:played_at,priority:3"`
 	CreatedAt time.Time `json:"created_at"`
