@@ -14,7 +14,7 @@ var validAwards = map[string]struct{}{
 	"3 IN THE BLACK": {},
 	"3 IN A BED":     {},
 	"WHITE HORSE":    {},
-	"6 MARK": {},
+	"5 MARK": {},
 	"9 MARK": {},
 }
 
