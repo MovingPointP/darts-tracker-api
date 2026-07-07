@@ -26,11 +26,13 @@ type CreateGameRecordRequest struct {
 	GameType string    `json:"game_type" binding:"required,oneof=01game cricket countup"`
 	Value    float64   `json:"value" binding:"gte=0"`
 	PlayedAt time.Time `json:"played_at" binding:"required"`
+	Awards   map[string]int `json:"awards"`
 }
 
 type UpdateGameRecordRequest struct {
 	Value    float64   `json:"value" binding:"gte=0"`
 	PlayedAt time.Time `json:"played_at" binding:"required"`
+	Awards   map[string]int `json:"awards"`
 }
 
 func getUserID(ctx *gin.Context) string {
@@ -55,9 +57,14 @@ func (h *GameRecordHandler) CreateGameRecord(ctx *gin.Context) {
 		return
 	}
 
-	record, err := h.gameRecordUsecase.Create(getUserID(ctx), entity.GameType(req.GameType), req.Value, req.PlayedAt)
+	awards := req.Awards
+	if awards == nil {
+		awards = map[string]int{}
+	}
+	record, err := h.gameRecordUsecase.Create(getUserID(ctx), entity.GameType(req.GameType), req.Value, req.PlayedAt, awards)
 	if err != nil {
-		if errors.Is(err, entity.ErrInvalidGameType) || errors.Is(err, entity.ErrValueOutOfRange) {
+		if errors.Is(err, entity.ErrInvalidGameType) || errors.Is(err, entity.ErrValueOutOfRange) ||
+			errors.Is(err, entity.ErrInvalidAwardName) || errors.Is(err, entity.ErrInvalidAwardCount) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -202,13 +209,14 @@ func (h *GameRecordHandler) UpdateGameRecord(ctx *gin.Context) {
 		return
 	}
 
-	record, err := h.gameRecordUsecase.Update(uint(id), getUserID(ctx), req.Value, req.PlayedAt)
+	record, err := h.gameRecordUsecase.Update(uint(id), getUserID(ctx), req.Value, req.PlayedAt, req.Awards)
 	if err != nil {
 		if errors.Is(err, entity.ErrGameRecordNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
-		if errors.Is(err, entity.ErrValueOutOfRange) {
+		if errors.Is(err, entity.ErrValueOutOfRange) ||
+			errors.Is(err, entity.ErrInvalidAwardName) || errors.Is(err, entity.ErrInvalidAwardCount) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

@@ -11,11 +11,11 @@ import (
 )
 
 type GameRecordUsecase interface {
-	Create(userID string, gameType entity.GameType, value float64, playedAt time.Time) (*entity.GameRecord, error)
+	Create(userID string, gameType entity.GameType, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error)
 	Get(id uint, userID string) (*entity.GameRecord, error)
 	GetWithFilter(userID string, filter repository.RecordsFilter) (*repository.PagedRecords, error)
 	GetDailyRatings(userID string, gameType entity.GameType) ([]*repository.DailyRating, error)
-	Update(id uint, userID string, value float64, playedAt time.Time) (*entity.GameRecord, error)
+	Update(id uint, userID string, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error)
 	Delete(id uint, userID string) error
 }
 
@@ -27,12 +27,15 @@ func NewGameRecordUsecase(gameRecordRepo repository.GameRecordRepository) GameRe
 	return &gameRecordUsecase{gameRecordRepo: gameRecordRepo}
 }
 
-func (u *gameRecordUsecase) Create(userID string, gameType entity.GameType, value float64, playedAt time.Time) (*entity.GameRecord, error) {
+func (u *gameRecordUsecase) Create(userID string, gameType entity.GameType, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error) {
 	if !gameType.Valid() {
 		return nil, entity.ErrInvalidGameType
 	}
 	if value > maxValueForGameType(gameType) {
 		return nil, entity.ErrValueOutOfRange
+	}
+	if err := entity.ValidateAwards(awards); err != nil {
+		return nil, err
 	}
 
 	record := &entity.GameRecord{
@@ -40,6 +43,7 @@ func (u *gameRecordUsecase) Create(userID string, gameType entity.GameType, valu
 		GameType: gameType,
 		Value:    value,
 		Rating:   calculateRating(gameType, value),
+		Awards:   awards,
 		PlayedAt: playedAt,
 	}
 	if err := u.gameRecordRepo.Create(record); err != nil {
@@ -78,7 +82,7 @@ func (u *gameRecordUsecase) GetDailyRatings(userID string, gameType entity.GameT
 	return ratings, nil
 }
 
-func (u *gameRecordUsecase) Update(id uint, userID string, value float64, playedAt time.Time) (*entity.GameRecord, error) {
+func (u *gameRecordUsecase) Update(id uint, userID string, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error) {
 	record, err := u.gameRecordRepo.FindByID(id, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get game record: %w", err)
@@ -88,6 +92,12 @@ func (u *gameRecordUsecase) Update(id uint, userID string, value float64, played
 	}
 	if value > maxValueForGameType(record.GameType) {
 		return nil, entity.ErrValueOutOfRange
+	}
+	if awards != nil {
+		if err := entity.ValidateAwards(awards); err != nil {
+			return nil, err
+		}
+		record.Awards = awards
 	}
 
 	record.Value = value
