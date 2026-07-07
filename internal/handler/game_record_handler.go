@@ -209,11 +209,7 @@ func (h *GameRecordHandler) UpdateGameRecord(ctx *gin.Context) {
 		return
 	}
 
-	awards := req.Awards
-	if awards == nil {
-		awards = map[string]int{}
-	}
-	record, err := h.gameRecordUsecase.Update(uint(id), getUserID(ctx), req.Value, req.PlayedAt, awards)
+	record, err := h.gameRecordUsecase.Update(uint(id), getUserID(ctx), req.Value, req.PlayedAt, req.Awards)
 	if err != nil {
 		if errors.Is(err, entity.ErrGameRecordNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})

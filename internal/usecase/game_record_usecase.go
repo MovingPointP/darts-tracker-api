@@ -93,13 +93,15 @@ func (u *gameRecordUsecase) Update(id uint, userID string, value float64, played
 	if value > maxValueForGameType(record.GameType) {
 		return nil, entity.ErrValueOutOfRange
 	}
-	if err := entity.ValidateAwards(awards); err != nil {
-		return nil, err
+	if awards != nil {
+		if err := entity.ValidateAwards(awards); err != nil {
+			return nil, err
+		}
+		record.Awards = awards
 	}
 
 	record.Value = value
 	record.Rating = calculateRating(record.GameType, value)
-	record.Awards = awards
 	record.PlayedAt = playedAt
 
 	if err := u.gameRecordRepo.Update(record); err != nil {
