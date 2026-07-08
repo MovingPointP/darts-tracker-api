@@ -50,6 +50,7 @@ func NewRouter(authHandler *AuthHandler, gameRecordHandler *GameRecordHandler, a
 			stats := protected.Group("/stats")
 			{
 				stats.GET("/ratings", gameRecordHandler.GetDailyRatings)
+				stats.GET("/summary", gameRecordHandler.GetSummaryStats)
 			}
 		}
 	}

@@ -162,6 +162,25 @@ func (h *GameRecordHandler) GetGameRecords(ctx *gin.Context) {
 // @Failure     400 {object} map[string]string
 // @Failure     500 {object} map[string]string
 // @Router      /stats/ratings [get]
+func (h *GameRecordHandler) GetSummaryStats(ctx *gin.Context) {
+	q := ctx.Query("game_type")
+	if q == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "game_type is required"})
+		return
+	}
+
+	summary, err := h.gameRecordUsecase.GetSummary(getUserID(ctx), entity.GameType(q))
+	if err != nil {
+		if errors.Is(err, entity.ErrInvalidGameType) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get summary"})
+		return
+	}
+	ctx.JSON(http.StatusOK, summary)
+}
+
 func (h *GameRecordHandler) GetDailyRatings(ctx *gin.Context) {
 	q := ctx.Query("game_type")
 	if q == "" {
