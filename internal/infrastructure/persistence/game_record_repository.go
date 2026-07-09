@@ -73,6 +73,49 @@ func (r *gormGameRecordRepository) AggregateRatingByDay(userID string, gameType 
 	return results, err
 }
 
+func (r *gormGameRecordRepository) GetSummary(userID string, gameType entity.GameType) (*repository.GameSummary, error) {
+	type aggregateRow struct {
+		TotalGames int64    `gorm:"column:total_games"`
+		BestValue  *float64 `gorm:"column:best_value"`
+		BestRating *float64 `gorm:"column:best_rating"`
+	}
+	var agg aggregateRow
+	if err := r.db.Model(&entity.GameRecord{}).
+		Where("user_id = ? AND game_type = ?", userID, gameType).
+		Select("COUNT(*) AS total_games, MAX(value) AS best_value, MAX(rating) AS best_rating").
+		Row().Scan(&agg.TotalGames, &agg.BestValue, &agg.BestRating); err != nil {
+		return nil, err
+	}
+
+	type awardRow struct {
+		Key   string `gorm:"column:key"`
+		Total int    `gorm:"column:total"`
+	}
+	var rows []awardRow
+	if err := r.db.Raw(`
+		SELECT a.key, SUM(a.value::int) AS total
+		FROM game_records g
+		CROSS JOIN LATERAL jsonb_each_text(g.awards) AS a(key, value)
+		WHERE g.user_id = ? AND g.game_type = ?
+		GROUP BY a.key
+		ORDER BY total DESC
+	`, userID, gameType).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	awards := map[string]int{}
+	for _, row := range rows {
+		awards[row.Key] = row.Total
+	}
+
+	return &repository.GameSummary{
+		TotalGames: agg.TotalGames,
+		BestValue:  agg.BestValue,
+		BestRating: agg.BestRating,
+		Awards:     awards,
+	}, nil
+}
+
 func (r *gormGameRecordRepository) Update(record *entity.GameRecord) error {
 	return r.db.Save(record).Error
 }

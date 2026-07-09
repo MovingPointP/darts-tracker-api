@@ -29,11 +29,20 @@ type PagedRecords struct {
 	Offset  int                  `json:"offset"`
 }
 
+// GameSummary は種目ごとの集計結果。
+type GameSummary struct {
+	TotalGames int64          `json:"total_games"`
+	BestValue  *float64       `json:"best_value"`
+	BestRating *float64       `json:"best_rating"`
+	Awards     map[string]int `json:"awards"`
+}
+
 type GameRecordRepository interface {
 	Create(record *entity.GameRecord) error
 	FindByID(id uint, userID string) (*entity.GameRecord, error)
 	FindWithFilter(userID string, filter RecordsFilter) (*PagedRecords, error)
 	AggregateRatingByDay(userID string, gameType entity.GameType) ([]*DailyRating, error)
+	GetSummary(userID string, gameType entity.GameType) (*GameSummary, error)
 	Update(record *entity.GameRecord) error
 	Delete(id uint, userID string) error
 }

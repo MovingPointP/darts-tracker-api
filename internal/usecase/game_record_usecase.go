@@ -15,6 +15,7 @@ type GameRecordUsecase interface {
 	Get(id uint, userID string) (*entity.GameRecord, error)
 	GetWithFilter(userID string, filter repository.RecordsFilter) (*repository.PagedRecords, error)
 	GetDailyRatings(userID string, gameType entity.GameType) ([]*repository.DailyRating, error)
+	GetSummary(userID string, gameType entity.GameType) (*repository.GameSummary, error)
 	Update(id uint, userID string, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error)
 	Delete(id uint, userID string) error
 }
@@ -80,6 +81,17 @@ func (u *gameRecordUsecase) GetDailyRatings(userID string, gameType entity.GameT
 		return nil, fmt.Errorf("failed to aggregate ratings: %w", err)
 	}
 	return ratings, nil
+}
+
+func (u *gameRecordUsecase) GetSummary(userID string, gameType entity.GameType) (*repository.GameSummary, error) {
+	if !gameType.Valid() {
+		return nil, entity.ErrInvalidGameType
+	}
+	summary, err := u.gameRecordRepo.GetSummary(userID, gameType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get summary: %w", err)
+	}
+	return summary, nil
 }
 
 func (u *gameRecordUsecase) Update(id uint, userID string, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error) {
