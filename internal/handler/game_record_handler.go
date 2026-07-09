@@ -23,15 +23,15 @@ func NewGameRecordHandler(gameRecordUsecase usecase.GameRecordUsecase) *GameReco
 }
 
 type CreateGameRecordRequest struct {
-	GameType string    `json:"game_type" binding:"required,oneof=01game cricket countup"`
-	Value    float64   `json:"value" binding:"gte=0"`
-	PlayedAt time.Time `json:"played_at" binding:"required"`
+	GameType string         `json:"game_type" binding:"required,oneof=01game cricket countup"`
+	Value    float64        `json:"value" binding:"gte=0"`
+	PlayedAt time.Time      `json:"played_at" binding:"required"`
 	Awards   map[string]int `json:"awards"`
 }
 
 type UpdateGameRecordRequest struct {
-	Value    float64   `json:"value" binding:"gte=0"`
-	PlayedAt time.Time `json:"played_at" binding:"required"`
+	Value    float64        `json:"value" binding:"gte=0"`
+	PlayedAt time.Time      `json:"played_at" binding:"required"`
 	Awards   map[string]int `json:"awards"`
 }
 
@@ -199,8 +199,9 @@ func (h *GameRecordHandler) GetSummaryStats(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "game_type is required"})
 		return
 	}
+	gameType := entity.GameType(q)
 
-	summary, err := h.gameRecordUsecase.GetSummary(getUserID(ctx), entity.GameType(q))
+	summary, err := h.gameRecordUsecase.GetSummary(getUserID(ctx), gameType)
 	if err != nil {
 		if errors.Is(err, entity.ErrInvalidGameType) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -209,6 +210,7 @@ func (h *GameRecordHandler) GetSummaryStats(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get summary"})
 		return
 	}
+
 	ctx.JSON(http.StatusOK, summary)
 }
 
