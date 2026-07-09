@@ -93,9 +93,9 @@ func (r *gormGameRecordRepository) GetSummary(userID string, gameType entity.Gam
 	}
 	var rows []awardRow
 	if err := r.db.Raw(`
-		SELECT a.key, SUM((a.value)::text::int) AS total
+		SELECT a.key, SUM(a.value::int) AS total
 		FROM game_records g
-		CROSS JOIN LATERAL jsonb_each(g.awards) AS a(key, value)
+		CROSS JOIN LATERAL jsonb_each_text(g.awards) AS a(key, value)
 		WHERE g.user_id = ? AND g.game_type = ?
 		GROUP BY a.key
 		ORDER BY total DESC

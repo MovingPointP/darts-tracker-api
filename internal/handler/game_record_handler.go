@@ -162,25 +162,6 @@ func (h *GameRecordHandler) GetGameRecords(ctx *gin.Context) {
 // @Failure     400 {object} map[string]string
 // @Failure     500 {object} map[string]string
 // @Router      /stats/ratings [get]
-func (h *GameRecordHandler) GetSummaryStats(ctx *gin.Context) {
-	q := ctx.Query("game_type")
-	if q == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "game_type is required"})
-		return
-	}
-
-	summary, err := h.gameRecordUsecase.GetSummary(getUserID(ctx), entity.GameType(q))
-	if err != nil {
-		if errors.Is(err, entity.ErrInvalidGameType) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get summary"})
-		return
-	}
-	ctx.JSON(http.StatusOK, summary)
-}
-
 func (h *GameRecordHandler) GetDailyRatings(ctx *gin.Context) {
 	q := ctx.Query("game_type")
 	if q == "" {
@@ -200,6 +181,35 @@ func (h *GameRecordHandler) GetDailyRatings(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, ratings)
+}
+
+// @Summary     種目別集計サマリー取得
+// @Description 指定種目の総ゲーム数・最高スコア・最高レーティング・アワード獲得回数を返す
+// @Tags        stats
+// @Security    BearerAuth
+// @Produce     json
+// @Param       game_type query string true "種目(01game/cricket/countup)"
+// @Success     200 {object} repository.GameSummary
+// @Failure     400 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /stats/summary [get]
+func (h *GameRecordHandler) GetSummaryStats(ctx *gin.Context) {
+	q := ctx.Query("game_type")
+	if q == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "game_type is required"})
+		return
+	}
+
+	summary, err := h.gameRecordUsecase.GetSummary(getUserID(ctx), entity.GameType(q))
+	if err != nil {
+		if errors.Is(err, entity.ErrInvalidGameType) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get summary"})
+		return
+	}
+	ctx.JSON(http.StatusOK, summary)
 }
 
 // @Summary     記録更新
