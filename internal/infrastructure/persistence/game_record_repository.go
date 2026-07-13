@@ -62,27 +62,41 @@ func (r *gormGameRecordRepository) FindWithFilter(userID string, filter reposito
 	}, nil
 }
 
-func (r *gormGameRecordRepository) AggregateRatingByDay(userID string, gameType entity.GameType) ([]*repository.DailyRating, error) {
+// applyPeriod は期間フィルタ(任意)をクエリに適用する。
+// Toは指定日の終わりまで含めるため翌日未満で絞る(FindWithFilterと同じ規約)。
+func applyPeriod(query *gorm.DB, period repository.Period) *gorm.DB {
+	if period.From != nil {
+		query = query.Where("played_at >= ?", *period.From)
+	}
+	if period.To != nil {
+		query = query.Where("played_at < ?", period.To.AddDate(0, 0, 1))
+	}
+	return query
+}
+
+func (r *gormGameRecordRepository) AggregateRatingByDay(userID string, gameType entity.GameType, period repository.Period) ([]*repository.DailyRating, error) {
 	results := []*repository.DailyRating{}
-	err := r.db.Model(&entity.GameRecord{}).
+	query := r.db.Model(&entity.GameRecord{}).
 		Select("TO_CHAR(played_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, ROUND(AVG(rating)::numeric, 2) AS rating").
-		Where("user_id = ? AND game_type = ? AND rating IS NOT NULL", userID, gameType).
+		Where("user_id = ? AND game_type = ? AND rating IS NOT NULL", userID, gameType)
+	err := applyPeriod(query, period).
 		Group("TO_CHAR(played_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')").
 		Order("date ASC").
 		Scan(&results).Error
 	return results, err
 }
 
-func (r *gormGameRecordRepository) GetSummary(userID string, gameType entity.GameType) (*repository.GameSummary, error) {
+func (r *gormGameRecordRepository) GetSummary(userID string, gameType entity.GameType, period repository.Period) (*repository.GameSummary, error) {
 	type aggregateRow struct {
 		TotalGames int64    `gorm:"column:total_games"`
 		BestValue  *float64 `gorm:"column:best_value"`
 		BestRating *float64 `gorm:"column:best_rating"`
 	}
 	var agg aggregateRow
-	if err := r.db.Model(&entity.GameRecord{}).
+	aggQuery := r.db.Model(&entity.GameRecord{}).
 		Where("user_id = ? AND game_type = ?", userID, gameType).
-		Select("COUNT(*) AS total_games, MAX(value) AS best_value, MAX(rating) AS best_rating").
+		Select("COUNT(*) AS total_games, MAX(value) AS best_value, MAX(rating) AS best_rating")
+	if err := applyPeriod(aggQuery, period).
 		Row().Scan(&agg.TotalGames, &agg.BestValue, &agg.BestRating); err != nil {
 		return nil, err
 	}
@@ -91,15 +105,25 @@ func (r *gormGameRecordRepository) GetSummary(userID string, gameType entity.Gam
 		Key   string `gorm:"column:key"`
 		Total int    `gorm:"column:total"`
 	}
+	where := "g.user_id = ? AND g.game_type = ?"
+	args := []any{userID, gameType}
+	if period.From != nil {
+		where += " AND g.played_at >= ?"
+		args = append(args, *period.From)
+	}
+	if period.To != nil {
+		where += " AND g.played_at < ?"
+		args = append(args, period.To.AddDate(0, 0, 1))
+	}
 	var rows []awardRow
 	if err := r.db.Raw(`
 		SELECT a.key, SUM(a.value::int) AS total
 		FROM game_records g
 		CROSS JOIN LATERAL jsonb_each_text(g.awards) AS a(key, value)
-		WHERE g.user_id = ? AND g.game_type = ?
+		WHERE `+where+`
 		GROUP BY a.key
 		ORDER BY total DESC
-	`, userID, gameType).Scan(&rows).Error; err != nil {
+	`, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 

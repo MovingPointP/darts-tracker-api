@@ -14,8 +14,8 @@ type GameRecordUsecase interface {
 	Create(userID string, gameType entity.GameType, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error)
 	Get(id uint, userID string) (*entity.GameRecord, error)
 	GetWithFilter(userID string, filter repository.RecordsFilter) (*repository.PagedRecords, error)
-	GetDailyRatings(userID string, gameType entity.GameType) ([]*repository.DailyRating, error)
-	GetSummary(userID string, gameType entity.GameType) (*repository.GameSummary, error)
+	GetDailyRatings(userID string, gameType entity.GameType, period repository.Period) ([]*repository.DailyRating, error)
+	GetSummary(userID string, gameType entity.GameType, period repository.Period) (*repository.GameSummary, error)
 	Update(id uint, userID string, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error)
 	Delete(id uint, userID string) error
 }
@@ -72,22 +72,22 @@ func (u *gameRecordUsecase) GetWithFilter(userID string, filter repository.Recor
 	return result, nil
 }
 
-func (u *gameRecordUsecase) GetDailyRatings(userID string, gameType entity.GameType) ([]*repository.DailyRating, error) {
+func (u *gameRecordUsecase) GetDailyRatings(userID string, gameType entity.GameType, period repository.Period) ([]*repository.DailyRating, error) {
 	if !gameType.Valid() || gameType == entity.GameTypeCountUp {
 		return nil, entity.ErrInvalidGameType
 	}
-	ratings, err := u.gameRecordRepo.AggregateRatingByDay(userID, gameType)
+	ratings, err := u.gameRecordRepo.AggregateRatingByDay(userID, gameType, period)
 	if err != nil {
 		return nil, fmt.Errorf("failed to aggregate ratings: %w", err)
 	}
 	return ratings, nil
 }
 
-func (u *gameRecordUsecase) GetSummary(userID string, gameType entity.GameType) (*repository.GameSummary, error) {
+func (u *gameRecordUsecase) GetSummary(userID string, gameType entity.GameType, period repository.Period) (*repository.GameSummary, error) {
 	if !gameType.Valid() {
 		return nil, entity.ErrInvalidGameType
 	}
-	summary, err := u.gameRecordRepo.GetSummary(userID, gameType)
+	summary, err := u.gameRecordRepo.GetSummary(userID, gameType, period)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get summary: %w", err)
 	}

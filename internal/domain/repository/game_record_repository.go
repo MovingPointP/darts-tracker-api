@@ -15,6 +15,13 @@ type RecordsFilter struct {
 	Offset   int
 }
 
+// Period は集計対象の期間フィルタ(任意)。FromもToもnilなら全期間。
+// Toはその日の終わりまで含める運用(永続化層で+1日する)。
+type Period struct {
+	From *time.Time
+	To   *time.Time
+}
+
 // DailyRating は日別の平均レーティング。
 type DailyRating struct {
 	Date   string  `json:"date"`
@@ -41,8 +48,8 @@ type GameRecordRepository interface {
 	Create(record *entity.GameRecord) error
 	FindByID(id uint, userID string) (*entity.GameRecord, error)
 	FindWithFilter(userID string, filter RecordsFilter) (*PagedRecords, error)
-	AggregateRatingByDay(userID string, gameType entity.GameType) ([]*DailyRating, error)
-	GetSummary(userID string, gameType entity.GameType) (*GameSummary, error)
+	AggregateRatingByDay(userID string, gameType entity.GameType, period Period) ([]*DailyRating, error)
+	GetSummary(userID string, gameType entity.GameType, period Period) (*GameSummary, error)
 	Update(record *entity.GameRecord) error
 	Delete(id uint, userID string) error
 }

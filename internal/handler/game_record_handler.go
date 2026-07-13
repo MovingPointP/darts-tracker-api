@@ -39,6 +39,26 @@ func getUserID(ctx *gin.Context) string {
 	return ctx.MustGet("UserID").(string)
 }
 
+// parseDateRange はfrom/toクエリ(YYYY-MM-DD、いずれも任意)を解析する。
+// Toは呼び出し側(永続化層)で当日終わりまで含める運用。
+func parseDateRange(ctx *gin.Context) (from, to *time.Time, err error) {
+	if q := ctx.Query("from"); q != "" {
+		t, e := time.Parse("2006-01-02", q)
+		if e != nil {
+			return nil, nil, errors.New("invalid from date, expected YYYY-MM-DD")
+		}
+		from = &t
+	}
+	if q := ctx.Query("to"); q != "" {
+		t, e := time.Parse("2006-01-02", q)
+		if e != nil {
+			return nil, nil, errors.New("invalid to date, expected YYYY-MM-DD")
+		}
+		to = &t
+	}
+	return from, to, nil
+}
+
 // @Summary     記録作成
 // @Description 新しいゲーム記録を作成する。01game/cricketはレーティングを自動算出する
 // @Tags        records
@@ -103,23 +123,13 @@ func (h *GameRecordHandler) GetGameRecords(ctx *gin.Context) {
 		filter.GameType = &gt
 	}
 
-	if q := ctx.Query("from"); q != "" {
-		t, err := time.Parse("2006-01-02", q)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid from date, expected YYYY-MM-DD"})
-			return
-		}
-		filter.From = &t
+	from, to, err := parseDateRange(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-
-	if q := ctx.Query("to"); q != "" {
-		t, err := time.Parse("2006-01-02", q)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid to date, expected YYYY-MM-DD"})
-			return
-		}
-		filter.To = &t
-	}
+	filter.From = from
+	filter.To = to
 
 	if q := ctx.Query("limit"); q != "" {
 		v, err := strconv.Atoi(q)
@@ -157,7 +167,9 @@ func (h *GameRecordHandler) GetGameRecords(ctx *gin.Context) {
 // @Tags        stats
 // @Security    BearerAuth
 // @Produce     json
-// @Param       game_type query string true "種目(01game/cricket)"
+// @Param       game_type query string true  "種目(01game/cricket)"
+// @Param       from      query string false "開始日(YYYY-MM-DD)"
+// @Param       to        query string false "終了日(YYYY-MM-DD)"
 // @Success     200 {array} repository.DailyRating
 // @Failure     400 {object} map[string]string
 // @Failure     500 {object} map[string]string
@@ -170,7 +182,13 @@ func (h *GameRecordHandler) GetDailyRatings(ctx *gin.Context) {
 	}
 	gameType := entity.GameType(q)
 
-	ratings, err := h.gameRecordUsecase.GetDailyRatings(getUserID(ctx), gameType)
+	from, to, err := parseDateRange(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ratings, err := h.gameRecordUsecase.GetDailyRatings(getUserID(ctx), gameType, repository.Period{From: from, To: to})
 	if err != nil {
 		if errors.Is(err, entity.ErrInvalidGameType) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -188,7 +206,9 @@ func (h *GameRecordHandler) GetDailyRatings(ctx *gin.Context) {
 // @Tags        stats
 // @Security    BearerAuth
 // @Produce     json
-// @Param       game_type query string true "種目(01game/cricket/countup)"
+// @Param       game_type query string true  "種目(01game/cricket/countup)"
+// @Param       from      query string false "開始日(YYYY-MM-DD)"
+// @Param       to        query string false "終了日(YYYY-MM-DD)"
 // @Success     200 {object} repository.GameSummary
 // @Failure     400 {object} map[string]string
 // @Failure     500 {object} map[string]string
@@ -201,7 +221,13 @@ func (h *GameRecordHandler) GetSummaryStats(ctx *gin.Context) {
 	}
 	gameType := entity.GameType(q)
 
-	summary, err := h.gameRecordUsecase.GetSummary(getUserID(ctx), gameType)
+	from, to, err := parseDateRange(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	summary, err := h.gameRecordUsecase.GetSummary(getUserID(ctx), gameType, repository.Period{From: from, To: to})
 	if err != nil {
 		if errors.Is(err, entity.ErrInvalidGameType) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
