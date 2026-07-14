@@ -90,14 +90,16 @@ func (r *gormGameRecordRepository) GetSummary(userID string, gameType entity.Gam
 	type aggregateRow struct {
 		TotalGames int64    `gorm:"column:total_games"`
 		BestValue  *float64 `gorm:"column:best_value"`
+		AvgValue   *float64 `gorm:"column:avg_value"`
 		BestRating *float64 `gorm:"column:best_rating"`
+		AvgRating  *float64 `gorm:"column:avg_rating"`
 	}
 	var agg aggregateRow
 	aggQuery := r.db.Model(&entity.GameRecord{}).
 		Where("user_id = ? AND game_type = ?", userID, gameType).
-		Select("COUNT(*) AS total_games, MAX(value) AS best_value, MAX(rating) AS best_rating")
+		Select("COUNT(*) AS total_games, MAX(value) AS best_value, AVG(value) AS avg_value, MAX(rating) AS best_rating, AVG(rating) AS avg_rating")
 	if err := applyPeriod(aggQuery, period).
-		Row().Scan(&agg.TotalGames, &agg.BestValue, &agg.BestRating); err != nil {
+		Row().Scan(&agg.TotalGames, &agg.BestValue, &agg.AvgValue, &agg.BestRating, &agg.AvgRating); err != nil {
 		return nil, err
 	}
 
@@ -135,7 +137,9 @@ func (r *gormGameRecordRepository) GetSummary(userID string, gameType entity.Gam
 	return &repository.GameSummary{
 		TotalGames: agg.TotalGames,
 		BestValue:  agg.BestValue,
+		AvgValue:   agg.AvgValue,
 		BestRating: agg.BestRating,
+		AvgRating:  agg.AvgRating,
 		Awards:     awards,
 	}, nil
 }

@@ -40,7 +40,9 @@ type PagedRecords struct {
 type GameSummary struct {
 	TotalGames int64          `json:"total_games"`
 	BestValue  *float64       `json:"best_value"`
+	AvgValue   *float64       `json:"avg_value"`
 	BestRating *float64       `json:"best_rating"`
+	AvgRating  *float64       `json:"avg_rating"`
 	Awards     map[string]int `json:"awards"`
 }
 
