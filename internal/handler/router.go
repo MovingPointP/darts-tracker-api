@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -21,6 +22,11 @@ func NewRouter(authHandler *AuthHandler, gameRecordHandler *GameRecordHandler, a
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}))
+
+	// ヘルスチェック(認証不要・DBアクセスなし)。Renderのスピンダウン回避のキープアライブpingにも使う。
+	r.GET("/health", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
