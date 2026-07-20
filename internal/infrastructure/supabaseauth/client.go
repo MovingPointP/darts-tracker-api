@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -48,18 +49,44 @@ func (c *Client) RefreshToken(refreshToken string) (statusCode int, body []byte,
 	return c.post("/auth/v1/token?grant_type=refresh_token", map[string]string{"refresh_token": refreshToken})
 }
 
+// RequestPasswordRecovery はSupabase Authへパスワードリセットメールの送信をプロキシする。
+// redirectTo にはメール内リンクの遷移先(フロントのreset-passwordページ)を指定する。
+// Supabaseのリダイレクト許可リスト(Redirect URLs)に登録されている必要がある。
+func (c *Client) RequestPasswordRecovery(email, redirectTo string) (statusCode int, body []byte, err error) {
+	path := "/auth/v1/recover"
+	if redirectTo != "" {
+		path += "?redirect_to=" + url.QueryEscape(redirectTo)
+	}
+	return c.post(path, map[string]string{"email": email})
+}
+
+// UpdatePassword はリカバリーセッションのアクセストークンを使い、ユーザーのパスワードを更新する。
+// アクセストークンはメールのリンク経由で発行されたリカバリーセッションのものを渡す。
+func (c *Client) UpdatePassword(accessToken, password string) (statusCode int, body []byte, err error) {
+	return c.doRequest(http.MethodPut, "/auth/v1/user", accessToken, map[string]string{"password": password})
+}
+
 func (c *Client) post(path string, payload map[string]string) (int, []byte, error) {
+	return c.doRequest(http.MethodPost, path, "", payload)
+}
+
+// doRequest はSupabase Auth REST APIへJSONリクエストを送り、ステータスとレスポンスボディを返す。
+// bearerToken が空でなければ Authorization ヘッダーを付与する(ユーザー操作系エンドポイント用)。
+func (c *Client) doRequest(method, path, bearerToken string, payload map[string]string) (int, []byte, error) {
 	reqBody, err := json.Marshal(payload)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, c.baseURL+path, bytes.NewReader(reqBody))
+	req, err := http.NewRequest(method, c.baseURL+path, bytes.NewReader(reqBody))
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("apikey", c.publishableKey)
+	if bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+bearerToken)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

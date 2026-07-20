@@ -32,6 +32,18 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+// パスワードリセットメール送信のリクエストボディ
+type RecoverRequest struct {
+	Email      string `json:"email" binding:"required,email"`
+	RedirectTo string `json:"redirect_to"`
+}
+
+// パスワード再設定のリクエストボディ
+type ResetPasswordRequest struct {
+	AccessToken string `json:"access_token" binding:"required"`
+	Password    string `json:"password" binding:"required,min=8"`
+}
+
 // @Summary     サインアップ
 // @Description Supabase Authへプロキシしてユーザー登録する。レスポンスはSupabaseのものをそのまま返す
 // @Tags        auth
@@ -99,6 +111,54 @@ func (h *AuthHandler) Refresh(ctx *gin.Context) {
 	status, body, err := h.supabaseClient.RefreshToken(req.RefreshToken)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to refresh token"})
+		return
+	}
+	ctx.Data(status, "application/json", body)
+}
+
+// @Summary     パスワードリセットメール送信
+// @Description Supabase Authへプロキシしてパスワードリセット用のメールを送信する。メールアドレスの存在有無を漏らさないよう、Supabaseは登録有無に関わらず成功を返す
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body RecoverRequest true "リセット対象のメールアドレスと遷移先URL"
+// @Success     200 {object} map[string]interface{}
+// @Failure     400 {object} map[string]string
+// @Router      /auth/recover [post]
+func (h *AuthHandler) RequestPasswordReset(ctx *gin.Context) {
+	var req RecoverRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	status, body, err := h.supabaseClient.RequestPasswordRecovery(req.Email, req.RedirectTo)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to request password reset"})
+		return
+	}
+	ctx.Data(status, "application/json", body)
+}
+
+// @Summary     パスワード再設定
+// @Description リカバリーセッションのアクセストークンを使い、Supabase Authへプロキシして新しいパスワードを設定する
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body ResetPasswordRequest true "リカバリーのアクセストークンと新パスワード"
+// @Success     200 {object} map[string]interface{}
+// @Failure     400 {object} map[string]string
+// @Router      /auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(ctx *gin.Context) {
+	var req ResetPasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	status, body, err := h.supabaseClient.UpdatePassword(req.AccessToken, req.Password)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset password"})
 		return
 	}
 	ctx.Data(status, "application/json", body)

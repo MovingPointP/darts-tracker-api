@@ -39,6 +39,8 @@ func NewRouter(authHandler *AuthHandler, gameRecordHandler *GameRecordHandler, a
 			auth.POST("/signup", authHandler.SignUp)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
+			auth.POST("/recover", authHandler.RequestPasswordReset)
+			auth.POST("/reset-password", authHandler.ResetPassword)
 		}
 
 		// 認証必要
