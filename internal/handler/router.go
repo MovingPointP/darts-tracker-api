@@ -47,6 +47,9 @@ func NewRouter(authHandler *AuthHandler, gameRecordHandler *GameRecordHandler, a
 		protected := v1.Group("")
 		protected.Use(authMiddleware)
 		{
+			// ログイン中ユーザー自身の情報(認証が要るため/authグループではなくこちら)
+			protected.GET("/auth/me", authHandler.Me)
+
 			records := protected.Group("/records")
 			{
 				records.POST("", gameRecordHandler.CreateGameRecord)

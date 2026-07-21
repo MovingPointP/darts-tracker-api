@@ -66,19 +66,29 @@ func (c *Client) UpdatePassword(accessToken, password string) (statusCode int, b
 	return c.doRequest(http.MethodPut, "/auth/v1/user", accessToken, map[string]string{"password": password})
 }
 
+// GetUser はアクセストークンの持ち主のユーザー情報(メールアドレス等)を取得する。
+func (c *Client) GetUser(accessToken string) (statusCode int, body []byte, err error) {
+	return c.doRequest(http.MethodGet, "/auth/v1/user", accessToken, nil)
+}
+
 func (c *Client) post(path string, payload map[string]string) (int, []byte, error) {
 	return c.doRequest(http.MethodPost, path, "", payload)
 }
 
 // doRequest はSupabase Auth REST APIへJSONリクエストを送り、ステータスとレスポンスボディを返す。
 // bearerToken が空でなければ Authorization ヘッダーを付与する(ユーザー操作系エンドポイント用)。
+// payload が nil の場合はボディ無しで送る(GET等)。
 func (c *Client) doRequest(method, path, bearerToken string, payload map[string]string) (int, []byte, error) {
-	reqBody, err := json.Marshal(payload)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to marshal request: %w", err)
+	var reqBody io.Reader
+	if payload != nil {
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to marshal request: %w", err)
+		}
+		reqBody = bytes.NewReader(encoded)
 	}
 
-	req, err := http.NewRequest(method, c.baseURL+path, bytes.NewReader(reqBody))
+	req, err := http.NewRequest(method, c.baseURL+path, reqBody)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to build request: %w", err)
 	}

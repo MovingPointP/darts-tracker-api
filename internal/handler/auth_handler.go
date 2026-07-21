@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/MovingPointP/darts-tracker-api/internal/infrastructure/supabaseauth"
 	"github.com/gin-gonic/gin"
@@ -159,6 +160,30 @@ func (h *AuthHandler) ResetPassword(ctx *gin.Context) {
 	status, body, err := h.supabaseClient.UpdatePassword(req.AccessToken, req.Password)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset password"})
+		return
+	}
+	ctx.Data(status, "application/json", body)
+}
+
+// @Summary     ログイン中ユーザーの情報取得
+// @Description アクセストークンの持ち主のユーザー情報(メールアドレス・登録日等)をSupabase Authから取得する
+// @Tags        auth
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} map[string]interface{}
+// @Failure     401 {object} map[string]string
+// @Router      /auth/me [get]
+func (h *AuthHandler) Me(ctx *gin.Context) {
+	// 認証ミドルウェアで検証済みのアクセストークンをそのままSupabaseへ中継する。
+	accessToken := strings.TrimPrefix(ctx.GetHeader("Authorization"), "Bearer ")
+	if accessToken == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header is required"})
+		return
+	}
+
+	status, body, err := h.supabaseClient.GetUser(accessToken)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user"})
 		return
 	}
 	ctx.Data(status, "application/json", body)
