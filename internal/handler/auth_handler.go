@@ -45,6 +45,13 @@ type ResetPasswordRequest struct {
 	Password    string `json:"password" binding:"required,min=8"`
 }
 
+// メールアドレス変更のリクエストボディ
+type ChangeEmailRequest struct {
+	AccessToken string `json:"access_token" binding:"required"`
+	Email       string `json:"email" binding:"required,email"`
+	RedirectTo  string `json:"redirect_to"`
+}
+
 // @Summary     サインアップ
 // @Description Supabase Authへプロキシしてユーザー登録する。レスポンスはSupabaseのものをそのまま返す
 // @Tags        auth
@@ -160,6 +167,30 @@ func (h *AuthHandler) ResetPassword(ctx *gin.Context) {
 	status, body, err := h.supabaseClient.UpdatePassword(req.AccessToken, req.Password)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset password"})
+		return
+	}
+	ctx.Data(status, "application/json", body)
+}
+
+// @Summary     メールアドレス変更の申請
+// @Description Supabase Authへプロキシしてメールアドレス変更の確認メールを送信する。確認リンクが踏まれるまで実際のアドレスは変更されない
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body ChangeEmailRequest true "アクセストークンと新しいメールアドレス"
+// @Success     200 {object} map[string]interface{}
+// @Failure     400 {object} map[string]string
+// @Router      /auth/change-email [post]
+func (h *AuthHandler) ChangeEmail(ctx *gin.Context) {
+	var req ChangeEmailRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	status, body, err := h.supabaseClient.UpdateEmail(req.AccessToken, req.Email, req.RedirectTo)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to change email"})
 		return
 	}
 	ctx.Data(status, "application/json", body)

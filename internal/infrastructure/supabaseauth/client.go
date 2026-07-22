@@ -71,6 +71,18 @@ func (c *Client) GetUser(accessToken string) (statusCode int, body []byte, err e
 	return c.doRequest(http.MethodGet, "/auth/v1/user", accessToken, nil)
 }
 
+// UpdateEmail はメールアドレスの変更を申請する。
+// 実際に変更されるのは確認メールのリンクが踏まれた後で、この時点では反映されない
+// (Supabaseの Secure email change が有効な場合、新旧両方のアドレスでの確認が必要)。
+// redirectTo には確認リンクの遷移先を指定し、Supabaseのリダイレクト許可リストに登録しておく。
+func (c *Client) UpdateEmail(accessToken, email, redirectTo string) (statusCode int, body []byte, err error) {
+	path := "/auth/v1/user"
+	if redirectTo != "" {
+		path += "?redirect_to=" + url.QueryEscape(redirectTo)
+	}
+	return c.doRequest(http.MethodPut, path, accessToken, map[string]string{"email": email})
+}
+
 func (c *Client) post(path string, payload map[string]string) (int, []byte, error) {
 	return c.doRequest(http.MethodPost, path, "", payload)
 }

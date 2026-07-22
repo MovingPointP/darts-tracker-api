@@ -41,6 +41,7 @@ func NewRouter(authHandler *AuthHandler, gameRecordHandler *GameRecordHandler, a
 			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/recover", authHandler.RequestPasswordReset)
 			auth.POST("/reset-password", authHandler.ResetPassword)
+			auth.POST("/change-email", authHandler.ChangeEmail)
 		}
 
 		// 認証必要
