@@ -57,7 +57,7 @@ func main() {
 	gameRecordRepo := persistence.NewGameRecordRepository(conn)
 	gameRecordUsecase := usecase.NewGameRecordUsecase(gameRecordRepo)
 
-	authHandler := handler.NewAuthHandler(supabaseClient)
+	authHandler := handler.NewAuthHandler(supabaseClient, gameRecordUsecase)
 	gameRecordHandler := handler.NewGameRecordHandler(gameRecordUsecase)
 
 	// ルーター

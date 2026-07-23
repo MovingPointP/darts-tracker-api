@@ -5,15 +5,17 @@ import (
 	"strings"
 
 	"github.com/MovingPointP/darts-tracker-api/internal/infrastructure/supabaseauth"
+	"github.com/MovingPointP/darts-tracker-api/internal/usecase"
 	"github.com/gin-gonic/gin"
 )
 
 type AuthHandler struct {
-	supabaseClient *supabaseauth.Client
+	supabaseClient    *supabaseauth.Client
+	gameRecordUsecase usecase.GameRecordUsecase
 }
 
-func NewAuthHandler(supabaseClient *supabaseauth.Client) *AuthHandler {
-	return &AuthHandler{supabaseClient: supabaseClient}
+func NewAuthHandler(supabaseClient *supabaseauth.Client, gameRecordUsecase usecase.GameRecordUsecase) *AuthHandler {
+	return &AuthHandler{supabaseClient: supabaseClient, gameRecordUsecase: gameRecordUsecase}
 }
 
 // サインアップのリクエストボディ
@@ -218,4 +220,39 @@ func (h *AuthHandler) Me(ctx *gin.Context) {
 		return
 	}
 	ctx.Data(status, "application/json", body)
+}
+
+// @Summary     アカウント削除(退会)
+// @Description ログイン中ユーザーの全記録を削除し、Supabaseの認証ユーザーも管理者APIで削除する。不可逆
+// @Tags        auth
+// @Produce     json
+// @Security    BearerAuth
+// @Success     204
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /auth/account [delete]
+func (h *AuthHandler) DeleteAccount(ctx *gin.Context) {
+	userID := ctx.MustGet("UserID").(string)
+
+	// 先にSupabaseの認証ユーザーを削除する(service_roleが必要)。
+	// こちらの方が失敗しやすい(キー設定ミス等)ため先に実行し、失敗時は記録を消さずに
+	// 中断して安全に再試行できるようにする(記録先行で消すと「記録だけ消えてアカウントが残る」半壊になる)。
+	status, body, err := h.supabaseClient.DeleteUser(userID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete auth user"})
+		return
+	}
+	if status < 200 || status >= 300 {
+		ctx.Data(status, "application/json", body)
+		return
+	}
+
+	// 認証ユーザー削除に成功したら、アプリのデータ(記録)を削除する。
+	// auth.usersへの外部キーが無くカスケードされないため明示的に削除する。
+	if err := h.gameRecordUsecase.DeleteAllByUser(userID); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user records"})
+		return
+	}
+
+	ctx.Status(http.StatusNoContent)
 }

@@ -17,7 +17,10 @@ import (
 type Client struct {
 	baseURL        string
 	publishableKey string
-	httpClient     *http.Client
+	// secretKey はSupabaseのservice_role(sb_secret_...)。管理者API(ユーザー削除等)にのみ使う。
+	// 全権限を持つため、外部へは絶対に露出させない。退会機能を使わない場合は未設定でも起動できる。
+	secretKey  string
+	httpClient *http.Client
 }
 
 // コンストラクタ
@@ -30,6 +33,7 @@ func NewClient() (*Client, error) {
 	return &Client{
 		baseURL:        baseURL,
 		publishableKey: publishableKey,
+		secretKey:      os.Getenv("SUPABASE_SECRET_KEY"),
 		httpClient:     &http.Client{Timeout: 10 * time.Second},
 	}, nil
 }
@@ -81,6 +85,38 @@ func (c *Client) UpdateEmail(accessToken, email, redirectTo string) (statusCode 
 		path += "?redirect_to=" + url.QueryEscape(redirectTo)
 	}
 	return c.doRequest(http.MethodPut, path, accessToken, map[string]string{"email": email})
+}
+
+// DeleteUser はSupabaseの管理者APIでユーザーを完全に削除する(退会)。
+// service_role(secretKey)が必要。未設定の場合はエラーを返す。
+func (c *Client) DeleteUser(userID string) (statusCode int, body []byte, err error) {
+	if c.secretKey == "" {
+		return 0, nil, fmt.Errorf("SUPABASE_SECRET_KEY is not configured")
+	}
+
+	req, err := http.NewRequest(
+		http.MethodDelete,
+		c.baseURL+"/auth/v1/admin/users/"+url.PathEscape(userID),
+		nil,
+	)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to build request: %w", err)
+	}
+	// 管理者APIではapikey/Authorizationの両方にsecret key(service_role相当)を用いる。
+	req.Header.Set("apikey", c.secretKey)
+	req.Header.Set("Authorization", "Bearer "+c.secretKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to call supabase admin api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to read supabase admin api response: %w", err)
+	}
+	return resp.StatusCode, respBody, nil
 }
 
 func (c *Client) post(path string, payload map[string]string) (int, []byte, error) {

@@ -54,4 +54,6 @@ type GameRecordRepository interface {
 	GetSummary(userID string, gameType entity.GameType, period Period) (*GameSummary, error)
 	Update(record *entity.GameRecord) error
 	Delete(id uint, userID string) error
+	// DeleteAllByUser は指定ユーザーの全記録を削除する(退会時に使用)。
+	DeleteAllByUser(userID string) error
 }

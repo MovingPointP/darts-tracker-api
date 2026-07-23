@@ -18,6 +18,7 @@ type GameRecordUsecase interface {
 	GetSummary(userID string, gameType entity.GameType, period repository.Period) (*repository.GameSummary, error)
 	Update(id uint, userID string, value float64, playedAt time.Time, awards map[string]int) (*entity.GameRecord, error)
 	Delete(id uint, userID string) error
+	DeleteAllByUser(userID string) error
 }
 
 type gameRecordUsecase struct {
@@ -128,6 +129,13 @@ func (u *gameRecordUsecase) Delete(id uint, userID string) error {
 			return entity.ErrGameRecordNotFound
 		}
 		return fmt.Errorf("failed to delete game record: %w", err)
+	}
+	return nil
+}
+
+func (u *gameRecordUsecase) DeleteAllByUser(userID string) error {
+	if err := u.gameRecordRepo.DeleteAllByUser(userID); err != nil {
+		return fmt.Errorf("failed to delete all game records: %w", err)
 	}
 	return nil
 }

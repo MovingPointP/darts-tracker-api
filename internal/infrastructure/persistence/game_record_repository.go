@@ -158,3 +158,8 @@ func (r *gormGameRecordRepository) Delete(id uint, userID string) error {
 	}
 	return nil
 }
+
+func (r *gormGameRecordRepository) DeleteAllByUser(userID string) error {
+	// 記録が1件も無くてもエラーにしない(退会時の一括削除のため)。
+	return r.db.Where("user_id = ?", userID).Delete(&entity.GameRecord{}).Error
+}
